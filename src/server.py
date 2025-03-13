@@ -1,13 +1,18 @@
-from typing import Annotated, List
-
-# import pandas as pd
+import os
+import json
 import uvicorn
 from fastapi import FastAPI, HTTPException, Body
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from src.config import logger, public_or_local
-from src.models.schemes import HellowRequest
-from src.utils.greeting import hellow_names
+
+
+home_path = os.getcwd()
+
+sem_map_path = f"{home_path}/src/materials/not_and_numeric_year_sem.render.json"
+trend_map_path = f"{home_path}/src/materials/not_and_numeric_year_trend.render.json"
+
 
 if public_or_local == 'LOCAL':
     url = 'http://localhost'
@@ -27,32 +32,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-@app.post("/template_fast_api/v1/greetings")
-async def inputation(body: Annotated[
-    HellowRequest, Body(
-        example={"names": ['Sasha', 'Nikita', 'Kristina']})]):
+def load_json_from_file(file_path: str):
     try:
-        names = body.names
-        if names:
-            res = hellow_names(names)
-            return res
-        else:
-            logger.error("Something happened during creation of the search table")
-            raise HTTPException(
-                status_code=400,
-                detail="Bad Request",
-                headers={"X-Error": "Something happened during creation of the search table"},
-            )
-    except Exception as ApplicationError:
-        logger.error(ApplicationError.__repr__())
+        with open(file_path, "r", encoding="utf-8") as file:
+            return json.load(file)
+    except FileNotFoundError:
         raise HTTPException(
-            status_code=400,
-            detail="Unknown Error",
-            headers={"X-Error": f"{ApplicationError.__repr__()}"},
+            status_code=404,
+            detail=f"File not found: {file_path}",
+            headers={"X-Error": f"File not found: {file_path}"},
+        )
+    except json.JSONDecodeError:
+        raise HTTPException(
+            status_code=500,
+            detail="Error decoding JSON",
+            headers={"X-Error": "Error decoding JSON"},
         )
 
+
+@app.post("/template_fast_api/v1/sem_map")
+async def get_sem_map():
+    return JSONResponse(content=load_json_from_file(sem_map_path))
+
+
+@app.post("/template_fast_api/v1/trend_map")
+async def get_trend_map():
+    return JSONResponse(content=load_json_from_file(trend_map_path))
 
 @app.get("/")
 def read_root():
@@ -62,3 +67,4 @@ def read_root():
 if __name__ == "__main__":
     port = 7070
     uvicorn.run(app, host="0.0.0.0", port=port)
+    docs = 'http://0.0.0.0:7070/template_fast_api/v1/'
